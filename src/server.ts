@@ -1,9 +1,12 @@
 import dotenv from 'dotenv';
-import express, { Express } from 'express';
+import express, { Express, Request } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
 const app: Express = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const port = process.env.port || 3000;
 
 interface User {
@@ -17,7 +20,7 @@ interface Message {
 	userId: string;
 }
 
-const users: Record<string, User> = {
+let users: Record<string, User> = {
 	'1': {
 		id: '1',
 		username: 'Robin Wieruch',
@@ -28,7 +31,7 @@ const users: Record<string, User> = {
 	},
 };
 
-const messages: Record<string, Message> = {
+let messages: Record<string, Message> = {
 	'1': {
 		id: '1',
 		text: 'Hello World',
@@ -40,6 +43,15 @@ const messages: Record<string, Message> = {
 		userId: '2',
 	},
 };
+
+interface CustomRequest extends Request {
+	me?: User;
+}
+
+app.use((req: CustomRequest, res, next) => {
+	req.me = users[1];
+	next();
+});
 
 app.get('/users', (req, res) => {
 	return res.send(Object.values(users));
@@ -55,6 +67,27 @@ app.get('/messages', (req, res) => {
 
 app.get('/messages/:messageId', (req, res) => {
 	return res.send(messages[req.params.messageId]);
+});
+
+app.post('/messages', (req: CustomRequest, res) => {
+	const id = uuidv4();
+	const message = {
+		id,
+		text: req.body.text,
+		userId: req.me?.id || '1',
+	};
+
+	messages[id] = message;
+
+	return res.send(message);
+});
+
+app.delete('/messages/:messageId', (req, res) => {
+	const { [req.params.messageId]: message, ...otherMessages } = messages;
+
+	messages = otherMessages;
+
+	return res.send(message);
 });
 
 app.listen(port, () => {
